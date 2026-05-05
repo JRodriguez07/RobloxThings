@@ -97,7 +97,7 @@ end
 local function fetchLua(url)
     local raw
     local fetchOk, fetchErr = pcall(function()
-        raw = httpGet(url)
+        local raw = httpGet(url .. "?nocache=" .. tostring(os.time()))
     end)
     if not fetchOk then
         error("[Hub] Fetch failed for " .. url .. "\n" .. tostring(fetchErr))
