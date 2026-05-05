@@ -50,19 +50,24 @@ return {
 },
 
         -- ── Script 2 ─────────────────────────────────────────────
-        {
-            name     = "Script 2",
-            desc     = "Replace with your script",
-            onScript = guard .. [[
-
-                -- !! YOUR SCRIPT FOR PENTHOUSE TYCOON GOES HERE !!
-                print("Script 2 ON — replace this with your code")
-
-            ]],
-            offScript = [[
-                print("Script 2 OFF")
-            ]],
-        },
+{
+    name      = "Auto Buy",
+    desc      = "Automatically buys tycoon items",
+    onScript  = guard .. [[
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("__remotes")
+            :WaitForChild("TycoonService")
+            :WaitForChild("AutoBuyTS")
+            :FireServer(true)
+    ]],
+    offScript = [[
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("__remotes")
+            :WaitForChild("TycoonService")
+            :WaitForChild("AutoBuyTS")
+            :FireServer(false)
+    ]],
+},
 
         -- ── Script 3 ─────────────────────────────────────────────
         {
