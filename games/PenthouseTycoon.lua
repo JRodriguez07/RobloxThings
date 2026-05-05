@@ -7,7 +7,7 @@
 --   Push to GitHub — all players get the update on next load.
 -- ================================================================
 
-local PLACE_ID = 7205494657
+local PLACE_ID = 124943244212764
 
 -- Quick guard used at the top of every onScript
 local guard = string.format([[

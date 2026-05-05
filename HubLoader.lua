@@ -546,7 +546,17 @@ GamesTabBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Activate first tab
-if allTabBtns[1] then allTabBtns[1].MouseButton1Click:Fire() end
+do
+    deactivateAll()
+    GamesPanel.Visible = false
+    GameScriptsPanel.Visible = false
+    if allTabBtns[1] and allTabContents[1] then
+        allTabBtns[1].BackgroundTransparency = 0
+        allTabBtns[1].BackgroundColor3 = ACCENT
+        allTabBtns[1].TextColor3 = Color3.fromRGB(255, 255, 255)
+        allTabContents[1].Visible = true
+    end
+end
 
 -- ================================================================
 --   KEYBIND: RightShift = show / hide
