@@ -27,17 +27,24 @@ return {
 
         -- ── Script 1 ─────────────────────────────────────────────
         {
-            name     = "Script 1",
-            desc     = "Replace with your script",
+            name     = "Money Auto Collect",
+            desc     = "Collects money every 5 seconds",
             onScript = guard .. [[
-
-                -- !! YOUR SCRIPT FOR PENTHOUSE TYCOON GOES HERE !!
-                print("Script 1 ON — replace this with your code")
-
-            ]],
+                _G.PTMoneyLoop = task.spawn(function()
+                while _G.PTMoneyLoopActive do
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("__remotes")
+                    :WaitForChild("TycoonService")
+                    :WaitForChild("CollectMoneyTS")
+                    :FireServer()
+                task.wait(5)
+            end
+        end)
+        _G.PTMoneyLoopActive = true
+        ]],
             offScript = [[
-                -- Optional: cleanup / undo when toggled off
-                print("Script 1 OFF")
+                _G.PTMoneyLoopActive = false
+                _G.PTMoneyLoop = nil
             ]],
         },
 
