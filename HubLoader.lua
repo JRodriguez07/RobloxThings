@@ -3,7 +3,7 @@
 --   loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/HubLoader.lua?nc=" .. math.random(1, 2147483647)))()
 -- ================================================================
 
-local CONFIG_URL = "https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/HubConfig.lua"
+local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
 --   HTTP FETCH

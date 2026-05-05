@@ -17,7 +17,7 @@ return {
 
     -- ── Branding ─────────────────────────────────────────────────
     title   = "⚡ Jordans Hub ⚡",
-    version = "2.3",
+    version = "2.4",
     color   = {88, 130, 255},
 
     -- ── Game files ───────────────────────────────────────────────
@@ -25,7 +25,7 @@ return {
     -- The loader fetches all of them and builds the Games tab.
     -- Add a new line here whenever you create a new game file.
 gameFiles = {
-    "https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/Games/PenthouseTycoon.lua",
+    "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/Games/PenthouseTycoon.lua",
 },
 
     -- ── Regular tabs ─────────────────────────────────────────────
