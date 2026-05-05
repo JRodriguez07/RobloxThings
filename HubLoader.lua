@@ -10,7 +10,7 @@
 -- ================================================================
 
 -- !! SET THIS to your GitHub Raw URL for HubConfig.lua !!
-local CONFIG_URL = "https://raw.githubusercontent.com/YOURUSER/YOURREPO/main/HubConfig.lua"
+local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
 --   FETCH HELPER  (works across most executors)
