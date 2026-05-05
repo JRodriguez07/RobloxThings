@@ -51,21 +51,38 @@ return {
 
         -- ── Script 2 ─────────────────────────────────────────────
 {
-    name      = "Auto Buy123",
-    desc      = "Automatically buys tycoon items",
+    name      = "Auto Buy",
+    desc      = "Automatically buys all tycoon buttons",
     onScript  = guard .. [[
-        game:GetService("ReplicatedStorage")
-            :WaitForChild("__remotes")
-            :WaitForChild("TycoonService")
-            :WaitForChild("AutoBuyTS")
-            :FireServer(true)
+        _G.PTAutoBuyActive = true
+        task.spawn(function()
+            while _G.PTAutoBuyActive do
+                local lp = game.Players.LocalPlayer
+                local char = lp.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local tycoon = workspace:FindFirstChild("Tycoons")
+                    and workspace.Tycoons:FindFirstChild("1")
+                    and workspace.Tycoons["1"]:FindFirstChild("Tycoon")
+                local penthouse = tycoon and tycoon:FindFirstChild("Penthouse3")
+                local buttons = penthouse and penthouse:FindFirstChild("Buttons")
+
+                if buttons and hrp then
+                    for _, btn in ipairs(buttons:GetChildren()) do
+                        if not _G.PTAutoBuyActive then break end
+                        local press = btn:FindFirstChild("Press")
+                        if press then
+                            hrp.CFrame = press.CFrame + Vector3.new(0, 4, 0)
+                            task.wait(0.8)
+                        end
+                    end
+                end
+
+                task.wait(5) -- wait before looping again
+            end
+        end)
     ]],
     offScript = [[
-        game:GetService("ReplicatedStorage")
-            :WaitForChild("__remotes")
-            :WaitForChild("TycoonService")
-            :WaitForChild("AutoBuyTS")
-            :FireServer(false)
+        _G.PTAutoBuyActive = false
     ]],
 },
 
