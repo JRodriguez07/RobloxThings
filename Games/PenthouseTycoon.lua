@@ -57,8 +57,7 @@ return {
         _G.PTAutoBuyActive = true
         task.spawn(function()
             while _G.PTAutoBuyActive do
-                local lp = game.Players.LocalPlayer
-                local char = lp.Character
+                local char = game.Players.LocalPlayer.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local tycoon = workspace:FindFirstChild("Tycoons")
                     and workspace.Tycoons:FindFirstChild("1")
@@ -71,13 +70,15 @@ return {
                         if not _G.PTAutoBuyActive then break end
                         local press = btn:FindFirstChild("Press")
                         if press then
-                            hrp.CFrame = press.CFrame + Vector3.new(0, 4, 0)
-                            task.wait(0.8)
+                            firetouchinterest(hrp, press, 0) -- touch
+                            task.wait(0.1)
+                            firetouchinterest(hrp, press, 1) -- untouch
+                            task.wait(0.3)
                         end
                     end
                 end
 
-                task.wait(5) -- wait before looping again
+                task.wait(5)
             end
         end)
     ]],
@@ -85,24 +86,6 @@ return {
         _G.PTAutoBuyActive = false
     ]],
 },
-
-        -- ── Script 3 ─────────────────────────────────────────────
-        {
-            name     = "Script 3",
-            desc     = "Replace with your script",
-            onScript = guard .. [[
-
-                print("Script 3 ON — replace this with your code")
-
-            ]],
-            offScript = [[
-                print("Script 3 OFF")
-            ]],
-        },
-
-        -- ─────────────────────────────────────────────────────────
-        -- ADD MORE SCRIPTS BELOW — copy a block above and fill it in
-        -- ─────────────────────────────────────────────────────────
 
     },
 }
