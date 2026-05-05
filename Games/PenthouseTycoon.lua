@@ -52,7 +52,7 @@ return {
         -- ── Script 2 ─────────────────────────────────────────────
 {
     name      = "Auto Buy",
-    desc      = "Automatically buys all tycoon buttons",
+    desc      = "Automatically buys all tycoon buttons V1",
     onScript  = guard .. [[
         _G.PTAutoBuyActive = true
         task.spawn(function()
