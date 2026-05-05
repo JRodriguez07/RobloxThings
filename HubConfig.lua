@@ -24,10 +24,9 @@ return {
     -- Each URL points to a file in the Games/ folder.
     -- The loader fetches all of them and builds the Games tab.
     -- Add a new line here whenever you create a new game file.
-    gameFiles = {
-        "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/Games/PenthouseTycoon.lua",
-        -- "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/Games/AnotherGame.lua",
-    },
+gameFiles = {
+    "https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/Games/PenthouseTycoon.lua",
+},
 
     -- ── Regular tabs ─────────────────────────────────────────────
     tabs = {
