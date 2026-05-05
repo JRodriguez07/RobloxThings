@@ -97,7 +97,7 @@ end
 local function fetchLua(url)
     local raw
     local fetchOk, fetchErr = pcall(function()
-        local raw = httpGet(url .. "?nocache=" .. tostring(os.time()))
+        raw = httpGet(url .. "?nc=" .. tostring(math.floor(tick())))
     end)
     if not fetchOk then
         error("[Hub] Fetch failed for " .. url .. "\n" .. tostring(fetchErr))
@@ -416,7 +416,7 @@ lbl(TitleBar, { Text = cfg.title,       Size = UDim2.new(1,-80,1,0),  Position =
 lbl(TitleBar, { Text = "v"..cfg.version, Size = UDim2.new(0,50,1,0),   Position = UDim2.new(0,170,0,0), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
 
 local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
-local CloseBtn = mkbtn(TitleBar, { Text = "X", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_CLR })
+local CloseBtn = mkbtn(TitleBar, { Text = "✕", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_CLR })
 
 local dragging, dStart, dOrigin
 TitleBar.InputBegan:Connect(function(i)
