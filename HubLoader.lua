@@ -1,58 +1,135 @@
 -- ================================================================
 --   HubLoader.lua
 --   loadstring(game:HttpGet("https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubLoader.lua"))()
---
---   This file never needs to change. All content lives in:
---     HubConfig.lua   — branding, tabs, list of game file URLs
---     Games/*.lua     — one file per game
 -- ================================================================
 
 local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
 --   HTTP FETCH
+--   Uses type() not typeof() — works in all Lua environments.
+--   Every attempt is individually pcall'd.
+--   Prints which method worked so you can see it in the console.
 -- ================================================================
 local function httpGet(url)
-    local ok1, r1 = pcall(function() return game:HttpGet(url, true) end)
-    if ok1 and type(r1) == "string" and #r1 > 0 then return r1 end
 
-    if typeof(HttpGet) == "function" then
-        local ok2, r2 = pcall(HttpGet, url, true)
-        if ok2 and type(r2) == "string" and #r2 > 0 then return r2 end
+    -- Method 1: game:HttpGet (most executors)
+    local s1, r1 = pcall(game.HttpGet, game, url, true)
+    if s1 and type(r1) == "string" and #r1 > 10 then
+        print("[Hub] HTTP via game:HttpGet")
+        return r1
     end
-    if typeof(syn) == "table" and typeof(syn.request) == "function" then
-        local ok3, r3 = pcall(syn.request, { Url = url, Method = "GET" })
-        if ok3 and r3 and type(r3.Body) == "string" and #r3.Body > 0 then return r3.Body end
-    end
-    if typeof(http) == "table" and typeof(http.request) == "function" then
-        local ok4, r4 = pcall(http.request, { Url = url, Method = "GET" })
-        if ok4 and r4 and type(r4.Body) == "string" and #r4.Body > 0 then return r4.Body end
-    end
-    if typeof(request) == "function" then
-        local ok5, r5 = pcall(request, { Url = url, Method = "GET" })
-        if ok5 and r5 and type(r5.Body) == "string" and #r5.Body > 0 then return r5.Body end
-    end
-    local ok6, r6 = pcall(function() return game:GetService("HttpService"):GetAsync(url, true) end)
-    if ok6 and type(r6) == "string" and #r6 > 0 then return r6 end
 
-    error("[Hub] No working HTTP method found in this executor.")
+    -- Method 2: request() global (KRNL, Electron, etc.)
+    local s2, r2 = pcall(function()
+        return request({ Url = url, Method = "GET" })
+    end)
+    if s2 and type(r2) == "table" and type(r2.Body) == "string" and #r2.Body > 10 then
+        print("[Hub] HTTP via request()")
+        return r2.Body
+    end
+
+    -- Method 3: syn.request (Synapse X)
+    local s3, r3 = pcall(function()
+        return syn.request({ Url = url, Method = "GET" })
+    end)
+    if s3 and type(r3) == "table" and type(r3.Body) == "string" and #r3.Body > 10 then
+        print("[Hub] HTTP via syn.request")
+        return r3.Body
+    end
+
+    -- Method 4: http.request (Fluxus / Celery)
+    local s4, r4 = pcall(function()
+        return http.request({ Url = url, Method = "GET" })
+    end)
+    if s4 and type(r4) == "table" and type(r4.Body) == "string" and #r4.Body > 10 then
+        print("[Hub] HTTP via http.request")
+        return r4.Body
+    end
+
+    -- Method 5: HttpGet global (some older executors)
+    local s5, r5 = pcall(function()
+        return HttpGet(url, true)
+    end)
+    if s5 and type(r5) == "string" and #r5 > 10 then
+        print("[Hub] HTTP via HttpGet()")
+        return r5
+    end
+
+    -- Method 6: game.HttpGetAsync (Wave / newer executors)
+    local s6, r6 = pcall(function()
+        return game:HttpGetAsync(url)
+    end)
+    if s6 and type(r6) == "string" and #r6 > 10 then
+        print("[Hub] HTTP via game:HttpGetAsync")
+        return r6
+    end
+
+    -- Nothing worked — print exactly what each method returned
+    warn("[Hub] ALL HTTP methods failed for: " .. url)
+    warn("[Hub] Method results: "
+        .. tostring(s1) .. "/" .. tostring(r1) .. " | "
+        .. tostring(s2) .. "/" .. tostring(r2) .. " | "
+        .. tostring(s3) .. "/" .. tostring(r3)
+    )
+    error("[Hub] Could not fetch config. Check executor HTTP permissions.")
 end
 
+-- ================================================================
+--   SAFE LOADSTRING WRAPPER
+--   Handles executors that name it differently
+-- ================================================================
+local function safeLoadstring(code, chunkName)
+    -- Standard loadstring
+    local fn, err = loadstring(code, chunkName or "hub_chunk")
+    if fn then return fn end
+
+    -- Some executors use load() instead
+    local fn2, err2 = load(code, chunkName or "hub_chunk")
+    if fn2 then return fn2 end
+
+    return nil, err or err2
+end
+
+-- ================================================================
+--   FETCH + EXECUTE A LUA FILE FROM URL
+-- ================================================================
 local function fetchLua(url)
-    local raw = httpGet(url)
-    local fn, err = loadstring(raw)
-    if not fn then error("[Hub] Parse error (" .. url .. "): " .. tostring(err)) end
-    local ok, result = pcall(fn)
-    if not ok then error("[Hub] Runtime error (" .. url .. "): " .. tostring(result)) end
+    local raw
+    local fetchOk, fetchErr = pcall(function()
+        raw = httpGet(url)
+    end)
+    if not fetchOk then
+        error("[Hub] Fetch failed for " .. url .. "\n" .. tostring(fetchErr))
+    end
+
+    local fn, parseErr = safeLoadstring(raw, url)
+    if not fn then
+        error("[Hub] Parse error in " .. url .. "\n" .. tostring(parseErr))
+    end
+
+    local runOk, result = pcall(fn)
+    if not runOk then
+        error("[Hub] Runtime error in " .. url .. "\n" .. tostring(result))
+    end
+
     return result
 end
 
 -- ================================================================
---   LOAD MAIN CONFIG
+--   LOAD CONFIG — wrapped so errors print clearly
 -- ================================================================
-print("[Hub] Loading config...")
-local cfg = fetchLua(CONFIG_URL)
-if type(cfg) ~= "table" then error("[Hub] HubConfig.lua must return a table.") end
+print("[Hub] Loading config from GitHub...")
+local cfg
+local cfgOk, cfgErr = pcall(function()
+    cfg = fetchLua(CONFIG_URL)
+end)
+if not cfgOk then
+    error("[Hub] Failed to load HubConfig.lua:\n" .. tostring(cfgErr))
+end
+if type(cfg) ~= "table" then
+    error("[Hub] HubConfig.lua must return a table, got: " .. type(cfg))
+end
 
 cfg.title     = cfg.title     or "Hub"
 cfg.version   = cfg.version   or "1.0"
@@ -64,17 +141,18 @@ cfg.gameFiles = cfg.gameFiles or {}
 --   LOAD EACH GAME FILE
 -- ================================================================
 local games = {}
-for i, url in ipairs(cfg.gameFiles) do
+for _, url in ipairs(cfg.gameFiles) do
     local ok, result = pcall(fetchLua, url)
     if ok and type(result) == "table" then
         table.insert(games, result)
-        print("[Hub] Loaded game: " .. tostring(result.name or url))
+        print("[Hub] Game loaded: " .. tostring(result.name or url))
     else
-        warn("[Hub] Failed to load game file (" .. url .. "): " .. tostring(result))
+        warn("[Hub] Skipped game file: " .. url .. "\nReason: " .. tostring(result))
     end
 end
 
-print("[Hub] Ready — " .. #cfg.tabs .. " tabs, " .. #games .. " games")
+print("[Hub] " .. cfg.title .. " v" .. cfg.version
+    .. " | " .. #cfg.tabs .. " tabs | " .. #games .. " games")
 
 -- ================================================================
 --   SERVICES
@@ -82,7 +160,7 @@ print("[Hub] Ready — " .. #cfg.tabs .. " tabs, " .. #games .. " games")
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer      = Players.LocalPlayer
-local guiParent        = (typeof(gethui) == "function" and gethui())
+local guiParent        = pcall(function() return gethui() end) and gethui()
                       or LocalPlayer:WaitForChild("PlayerGui")
 
 local prev = guiParent:FindFirstChild("GHubGui")
@@ -147,7 +225,7 @@ local function mkbtn(parent, props)
     corner(b, 6)
     return b
 end
-local function makeScrollFrame(parent, name)
+local function makeScroll(parent, name)
     local sf = Instance.new("ScrollingFrame")
     sf.Name = name or "Scroll"
     sf.Size = UDim2.new(1, 0, 1, 0)
@@ -231,10 +309,18 @@ local function buildToggleCard(tcfg, order, parent)
         local turningOn = not enabled
         local code = turningOn and onScript or offScript
         if code ~= "" then
-            local compiled, compErr = loadstring(code)
-            if not compiled then warn("[Hub] Compile error '" .. name .. "': " .. tostring(compErr)) setState(false, true) return end
+            local compiled, compErr = safeLoadstring(code, name)
+            if not compiled then
+                warn("[Hub] Compile error '" .. name .. "': " .. tostring(compErr))
+                setState(false, true)
+                return
+            end
             local runOk, runErr = pcall(compiled)
-            if not runOk then warn("[Hub] Runtime error '" .. name .. "': " .. tostring(runErr)) setState(false, true) return end
+            if not runOk then
+                warn("[Hub] Runtime error '" .. name .. "': " .. tostring(runErr))
+                setState(false, true)
+                return
+            end
         end
         setState(turningOn, false)
     end)
@@ -262,14 +348,14 @@ local function buildGameCard(gameCfg, order, parent, onOpen)
     corner(icon, 8)
     stroke(icon, ACCENT, 1.5)
 
-    local iconLbl = Instance.new("TextLabel")
-    iconLbl.Size = UDim2.new(1, 0, 1, 0)
-    iconLbl.BackgroundTransparency = 1
-    iconLbl.Text = "🎮"
-    iconLbl.TextSize = 20
-    iconLbl.Font = Enum.Font.GothamBold
-    iconLbl.TextColor3 = ACCENT
-    iconLbl.Parent = icon
+    local iconTxt = Instance.new("TextLabel")
+    iconTxt.Size = UDim2.new(1, 0, 1, 0)
+    iconTxt.BackgroundTransparency = 1
+    iconTxt.Text = "🎮"
+    iconTxt.TextSize = 20
+    iconTxt.Font = Enum.Font.GothamBold
+    iconTxt.TextColor3 = ACCENT
+    iconTxt.Parent = icon
 
     lbl(Card, { Text = tostring(gameCfg.name or "Game"), Size = UDim2.new(1,-160,0,22), Position = UDim2.new(0,64,0,12), TextSize = 13 })
     lbl(Card, { Text = tostring(gameCfg.desc or ""),     Size = UDim2.new(1,-160,0,18), Position = UDim2.new(0,64,0,33), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
@@ -280,7 +366,6 @@ local function buildGameCard(gameCfg, order, parent, onOpen)
         Position = UDim2.new(1, -84, 0.5, -15),
         BackgroundColor3 = ACCENT,
         TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 12,
     })
     openBtn.MouseButton1Click:Connect(function() onOpen(gameCfg) end)
 end
@@ -311,7 +396,7 @@ topStripe.BorderSizePixel = 0
 topStripe.Parent = Main
 corner(topStripe, 4)
 
--- ── Title bar ──
+-- Title bar
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 44)
 TitleBar.Position = UDim2.new(0, 0, 0, 3)
@@ -327,11 +412,11 @@ tbPatch.BackgroundColor3 = BG_MID
 tbPatch.BorderSizePixel = 0
 tbPatch.Parent = TitleBar
 
-lbl(TitleBar, { Text = cfg.title, Size = UDim2.new(1,-80,1,0), Position = UDim2.new(0,14,0,0), TextSize = 15 })
-lbl(TitleBar, { Text = "v"..cfg.version, Size = UDim2.new(0,50,1,0), Position = UDim2.new(0,170,0,0), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
+lbl(TitleBar, { Text = cfg.title,       Size = UDim2.new(1,-80,1,0),  Position = UDim2.new(0,14,0,0),  TextSize = 15 })
+lbl(TitleBar, { Text = "v"..cfg.version, Size = UDim2.new(0,50,1,0),   Position = UDim2.new(0,170,0,0), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
 
 local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
-local CloseBtn = mkbtn(TitleBar, { Text = "✕", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_CLR })
+local CloseBtn = mkbtn(TitleBar, { Text = "X", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_CLR })
 
 local dragging, dStart, dOrigin
 TitleBar.InputBegan:Connect(function(i)
@@ -364,7 +449,7 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 CloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
 
--- ── Tab bar ──
+-- Tab bar
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 34)
 TabBar.Position = UDim2.new(0, 6, 0, 6)
@@ -389,20 +474,33 @@ ListHost.BackgroundTransparency = 1
 ListHost.Parent = Content
 
 -- ================================================================
---   BUILD REGULAR TABS
+--   REGULAR TABS
 -- ================================================================
 local allTabBtns     = {}
 local allTabContents = {}
+local GamesPanel, GameScriptsPanel  -- forward declare for deactivateAll
 
 local totalTabs = #cfg.tabs + 1
 local tabW = math.floor((W - 12 - (totalTabs - 1) * 3 - 8) / totalTabs)
 
-local function deactivateAll()
-    for _, tb in ipairs(allTabBtns) do
-        tb.BackgroundTransparency = 1
-        tb.TextColor3 = DIM
+local function activateTab(index, scroll)
+    for i, tb in ipairs(allTabBtns) do
+        if i == index then
+            tb.BackgroundTransparency = 0
+            tb.BackgroundColor3 = ACCENT
+            tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            tb.BackgroundTransparency = 1
+            tb.TextColor3 = DIM
+        end
     end
     for _, tc in ipairs(allTabContents) do tc.Visible = false end
+    if GamesPanel       then GamesPanel.Visible       = false end
+    if GameScriptsPanel then GameScriptsPanel.Visible = false end
+    if scroll then
+        scroll.Visible = true
+        scroll.CanvasPosition = Vector2.zero
+    end
 end
 
 for ti, tab in ipairs(cfg.tabs) do
@@ -416,7 +514,7 @@ for ti, tab in ipairs(cfg.tabs) do
     })
     allTabBtns[ti] = tabBtn
 
-    local tabScroll = makeScrollFrame(ListHost, "Tab_"..ti)
+    local tabScroll = makeScroll(ListHost, "Tab_"..ti)
     allTabContents[ti] = tabScroll
 
     for oi, tcfg in ipairs(tab.toggles or {}) do
@@ -424,14 +522,7 @@ for ti, tab in ipairs(cfg.tabs) do
     end
 
     tabBtn.MouseButton1Click:Connect(function()
-        deactivateAll()
-        GamesPanel.Visible = false
-        GameScriptsPanel.Visible = false
-        tabBtn.BackgroundTransparency = 0
-        tabBtn.BackgroundColor3 = ACCENT
-        tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tabScroll.Visible = true
-        tabScroll.CanvasPosition = Vector2.zero
+        activateTab(ti, tabScroll)
     end)
 end
 
@@ -450,11 +541,9 @@ local GamesTabBtn = mkbtn(TabBar, {
 })
 allTabBtns[gamesIdx] = GamesTabBtn
 
--- Games list panel
-local GamesPanel = makeScrollFrame(ListHost, "GamesPanel")
+GamesPanel = makeScroll(ListHost, "GamesPanel")
 
--- Game scripts sub-panel
-local GameScriptsPanel = Instance.new("Frame")
+GameScriptsPanel = Instance.new("Frame")
 GameScriptsPanel.Name = "GameScriptsPanel"
 GameScriptsPanel.Size = UDim2.new(1, 0, 1, 0)
 GameScriptsPanel.BackgroundTransparency = 1
@@ -509,12 +598,22 @@ local function openGameScripts(gameCfg)
     ScriptsScroll.CanvasPosition = Vector2.zero
 
     for _, child in ipairs(ScriptsScroll:GetChildren()) do
-        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then child:Destroy() end
+        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+            child:Destroy()
+        end
     end
 
     local scripts = gameCfg.scripts or {}
     if #scripts == 0 then
-        lbl(ScriptsScroll, { Text = "No scripts yet.", Size = UDim2.new(1,0,0,30), TextColor3 = DIM, TextXAlignment = Enum.TextXAlignment.Center, Font = Enum.Font.Gotham, TextSize = 12, LayoutOrder = 1 })
+        lbl(ScriptsScroll, {
+            Text = "No scripts yet.",
+            Size = UDim2.new(1,0,0,30),
+            TextColor3 = DIM,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            LayoutOrder = 1,
+        })
     else
         for si, scfg in ipairs(scripts) do
             buildToggleCard(scfg, si, ScriptsScroll)
@@ -532,31 +631,28 @@ for gi, gameCfg in ipairs(games) do
 end
 
 if #games == 0 then
-    lbl(GamesPanel, { Text = "No game files loaded.", Size = UDim2.new(1,0,0,30), TextColor3 = DIM, TextXAlignment = Enum.TextXAlignment.Center, Font = Enum.Font.Gotham, TextSize = 12, LayoutOrder = 1 })
+    lbl(GamesPanel, {
+        Text = "No games loaded — check HubConfig.lua gameFiles",
+        Size = UDim2.new(1,0,0,30),
+        TextColor3 = DIM,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        LayoutOrder = 1,
+    })
 end
 
 GamesTabBtn.MouseButton1Click:Connect(function()
-    deactivateAll()
-    GamesTabBtn.BackgroundTransparency = 0
-    GamesTabBtn.BackgroundColor3 = ACCENT
-    GamesTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    activateTab(gamesIdx, nil)
     if not GameScriptsPanel.Visible then
         GamesPanel.Visible = true
     end
 end)
 
--- Activate first tab
-do
-    deactivateAll()
-    GamesPanel.Visible = false
-    GameScriptsPanel.Visible = false
-    if allTabBtns[1] and allTabContents[1] then
-        allTabBtns[1].BackgroundTransparency = 0
-        allTabBtns[1].BackgroundColor3 = ACCENT
-        allTabBtns[1].TextColor3 = Color3.fromRGB(255, 255, 255)
-        allTabContents[1].Visible = true
-    end
-end
+-- ================================================================
+--   ACTIVATE FIRST TAB ON LOAD (no :Fire() needed)
+-- ================================================================
+activateTab(1, allTabContents[1])
 
 -- ================================================================
 --   KEYBIND: RightShift = show / hide
