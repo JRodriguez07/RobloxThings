@@ -51,7 +51,7 @@ return {
 
         -- ── Script 2 ─────────────────────────────────────────────
 {
-    name      = "Auto Buy1",
+    name      = "Auto Buy123",
     desc      = "Automatically buys tycoon items",
     onScript  = guard .. [[
         game:GetService("ReplicatedStorage")

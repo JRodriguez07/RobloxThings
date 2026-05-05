@@ -3,7 +3,7 @@
 --   loadstring(game:HttpGet("https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubLoader.lua"))()
 -- ================================================================
 
-local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua?nc=" .. math.floor(tick())
+local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
 --   HTTP FETCH
@@ -97,7 +97,7 @@ end
 local function fetchLua(url)
     local raw
     local fetchOk, fetchErr = pcall(function()
-        raw = httpGet(url .. "?nc=" .. tostring(math.floor(tick())))
+        raw = httpGet(url .. "?nc=" .. tostring(math.random(1, 2147483647)))
     end)
     if not fetchOk then
         error("[Hub] Fetch failed for " .. url .. "\n" .. tostring(fetchErr))
