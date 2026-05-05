@@ -26,27 +26,28 @@ return {
     scripts = {
 
         -- ── Script 1 ─────────────────────────────────────────────
-        {
-            name     = "Money Auto Collect",
-            desc     = "Collects money every 5 seconds",
-            onScript = guard .. [[
-                _G.PTMoneyLoop = task.spawn(function()
-                while _G.PTMoneyLoopActive do
-                game:GetService("ReplicatedStorage")
-                    :WaitForChild("__remotes")
-                    :WaitForChild("TycoonService")
-                    :WaitForChild("CollectMoneyTS")
-                    :FireServer()
+{
+    name     = "Money Auto Collect",
+    desc     = "Collects money every 5 seconds",
+    onScript = guard .. [[
+        _G.PTMoneyLoopActive = true
+        task.spawn(function()
+            while _G.PTMoneyLoopActive do
+                pcall(function()
+                    game:GetService("ReplicatedStorage")
+                        :WaitForChild("__remotes", 5)
+                        :WaitForChild("TycoonService", 5)
+                        :WaitForChild("CollectMoneyTS", 5)
+                        :FireServer()
+                end)
                 task.wait(5)
             end
         end)
-        _G.PTMoneyLoopActive = true
-        ]],
-            offScript = [[
-                _G.PTMoneyLoopActive = false
-                _G.PTMoneyLoop = nil
-            ]],
-        },
+    ]],
+    offScript = [[
+        _G.PTMoneyLoopActive = false
+    ]],
+},
 
         -- ── Script 2 ─────────────────────────────────────────────
         {
