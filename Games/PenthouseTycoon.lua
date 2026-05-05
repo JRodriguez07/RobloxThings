@@ -40,7 +40,7 @@ return {
                         :WaitForChild("CollectMoneyTS", 5)
                         :FireServer()
                 end)
-                task.wait(5)
+                task.wait(1)
             end
         end)
     ]],
