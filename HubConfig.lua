@@ -10,8 +10,8 @@
 return {
 
     -- ── Branding ─────────────────────────────────────────────────
-    title   = "⚡ MyHub",
-    version = "1.0",
+    title   = "⚡ Jordan's Game Hub",
+    version = "1.1",
     color   = {88, 130, 255},   -- RGB accent color
 
     -- ── Tabs & Toggles ───────────────────────────────────────────
@@ -224,6 +224,69 @@ return {
                 --     offScript = [[ print("off") ]],
                 -- },
                 -- ─────────────────────────────────────────────────
+
+            },
+        },
+
+        -- ══════════════════════════════════
+        --  GAMES  (game-specific scripts)
+        --  Add a new block per game below.
+        --  Tip: use PlaceId checks in your
+        --  onScript to guard against wrong games.
+        -- ══════════════════════════════════
+        {
+            name = "Games",
+            toggles = {
+
+                -- ──────────────────────────────────
+                --  🏠 PENTHOUSE TYCOON
+                --  PlaceId: 7205494657
+                -- ──────────────────────────────────
+                {
+                    name      = "Penthouse Tycoon",
+                    desc      = "Game-specific script",
+                    onScript  = [[
+                        -- !! PASTE YOUR PENTHOUSE TYCOON SCRIPT BELOW !!
+                        -- Example structure — replace everything inside:
+
+                        local placeId = 7205494657
+                        if game.PlaceId ~= placeId then
+                            warn("[Hub] Wrong game! This script is for Penthouse Tycoon.")
+                            return
+                        end
+
+                        -- YOUR SCRIPT GOES HERE:
+                        print("Penthouse Tycoon script running!")
+
+                        -- !! END OF YOUR SCRIPT !!
+                    ]],
+                    offScript = [[
+                        -- Optional: cleanup when toggled off
+                        -- e.g. disconnect connections, restore values
+                        print("Penthouse Tycoon script stopped.")
+                    ]],
+                },
+
+                -- ──────────────────────────────────
+                -- ADD MORE GAMES BELOW THIS LINE
+                -- Copy the block above, change the
+                -- name, desc, PlaceId, and scripts.
+                -- ──────────────────────────────────
+                -- {
+                --     name      = "Game Name Here",
+                --     desc      = "Short description",
+                --     onScript  = [[
+                --         local placeId = 0000000000  -- replace with real PlaceId
+                --         if game.PlaceId ~= placeId then
+                --             warn("[Hub] Wrong game!")
+                --             return
+                --         end
+                --         -- YOUR SCRIPT HERE
+                --     ]],
+                --     offScript = [[
+                --         -- CLEANUP HERE
+                --     ]],
+                -- },
 
             },
         },

@@ -215,7 +215,7 @@ lbl(TitleBar, {
 })
 
 local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
-local CloseBtn = mkbtn(TitleBar, { Text = "✕", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_COLOR })
+local CloseBtn = mkbtn(TitleBar, { Text = "X", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_COLOR })
 
 -- Dragging
 local dragging, dStart, dOrigin
