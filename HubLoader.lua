@@ -1,50 +1,83 @@
 -- ================================================================
---   HubLoader.lua  —  Host this on GitHub too
+--   HubLoader.lua  —  Host this on GitHub
 --
---   Players execute ONE line in their executor:
---   loadstring(game:HttpGet("https://raw.githubusercontent.com/YOURUSER/YOURREPO/main/HubLoader.lua"))()
---
---   This loader fetches HubConfig.lua from the same repo,
---   builds the full menu, and runs it. Push updates to either
---   file on GitHub — players always get the latest on next load.
+--   One-liner for players to run in their executor:
+--   loadstring(game:HttpGet("https://raw.githubusercontent.com/YOURUSER/myhub/main/HubLoader.lua"))()
 -- ================================================================
 
 -- !! SET THIS to your GitHub Raw URL for HubConfig.lua !!
 local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
---   FETCH HELPER  (works across most executors)
+--   FETCH HELPER  (broad executor compatibility)
 -- ================================================================
 local function httpGet(url)
-    -- game:HttpGet is the most common executor method
-    if game.HttpGet then
-        local ok, result = pcall(function() return game:HttpGet(url, true) end)
-        if ok and result and result ~= "" then return result end
+
+    -- Method 1: game:HttpGet  (Synapse X, Fluxus, most modern executors)
+    local ok1, r1 = pcall(function() return game:HttpGet(url, true) end)
+    if ok1 and type(r1) == "string" and #r1 > 0 then return r1 end
+
+    -- Method 2: HttpGet global  (some older executors)
+    if typeof(HttpGet) == "function" then
+        local ok2, r2 = pcall(HttpGet, url, true)
+        if ok2 and type(r2) == "string" and #r2 > 0 then return r2 end
     end
-    -- Fallback: syn / fluxus / other executor globals
-    for _, fn in ipairs({ syn and syn.request, http and http.request, request }) do
-        if fn then
-            local ok, res = pcall(fn, { Url = url, Method = "GET" })
-            if ok and res and res.Body and res.Body ~= "" then return res.Body end
-        end
+
+    -- Method 3: syn.request  (Synapse X)
+    if typeof(syn) == "table" and typeof(syn.request) == "function" then
+        local ok3, r3 = pcall(syn.request, { Url = url, Method = "GET" })
+        if ok3 and r3 and type(r3.Body) == "string" and #r3.Body > 0 then return r3.Body end
     end
-    error("[Hub] No HTTP method available in this executor.")
+
+    -- Method 4: http.request  (Fluxus / Celery)
+    if typeof(http) == "table" and typeof(http.request) == "function" then
+        local ok4, r4 = pcall(http.request, { Url = url, Method = "GET" })
+        if ok4 and r4 and type(r4.Body) == "string" and #r4.Body > 0 then return r4.Body end
+    end
+
+    -- Method 5: request global  (KRNL / Electron / others)
+    if typeof(request) == "function" then
+        local ok5, r5 = pcall(request, { Url = url, Method = "GET" })
+        if ok5 and r5 and type(r5.Body) == "string" and #r5.Body > 0 then return r5.Body end
+    end
+
+    -- Method 6: HttpService:GetAsync  (last resort)
+    local ok6, r6 = pcall(function()
+        return game:GetService("HttpService"):GetAsync(url, true)
+    end)
+    if ok6 and type(r6) == "string" and #r6 > 0 then return r6 end
+
+    error("[Hub] No working HTTP method found in this executor.")
 end
 
 -- ================================================================
---   LOAD CONFIG FROM GITHUB
+--   LOAD + VALIDATE CONFIG FROM GITHUB
 -- ================================================================
-print("[Hub] Fetching config...")
-local rawConfig = httpGet(CONFIG_URL)
+print("[Hub] Fetching config from GitHub...")
+
+local rawConfig
+local fetchOk, fetchErr = pcall(function() rawConfig = httpGet(CONFIG_URL) end)
+if not fetchOk then
+    error("[Hub] HTTP fetch failed: " .. tostring(fetchErr))
+end
+
 local configFn, parseErr = loadstring(rawConfig)
 if not configFn then
-    error("[Hub] Failed to parse config: " .. tostring(parseErr))
+    error("[Hub] Config syntax error: " .. tostring(parseErr))
 end
-local ok, cfg = pcall(configFn)
-if not ok or type(cfg) ~= "table" then
-    error("[Hub] Config did not return a valid table: " .. tostring(cfg))
+
+local runOk, cfg = pcall(configFn)
+if not runOk or type(cfg) ~= "table" then
+    error("[Hub] Config did not return a table: " .. tostring(cfg))
 end
-print("[Hub] Config loaded — " .. (cfg.title or "Hub") .. " v" .. (cfg.version or "?"))
+
+-- Safe defaults so nothing below ever sees nil
+cfg.title   = cfg.title   or "Hub"
+cfg.version = cfg.version or "1.0"
+cfg.color   = cfg.color   or {88, 130, 255}
+cfg.tabs    = cfg.tabs    or {}
+
+print("[Hub] Loaded: " .. cfg.title .. " v" .. cfg.version .. " | " .. #cfg.tabs .. " tab(s)")
 
 -- ================================================================
 --   SERVICES
@@ -55,21 +88,20 @@ local LocalPlayer      = Players.LocalPlayer
 local guiParent        = (typeof(gethui) == "function" and gethui())
                       or LocalPlayer:WaitForChild("PlayerGui")
 
--- Remove previous instance
 local prev = guiParent:FindFirstChild("GHubGui")
 if prev then prev:Destroy() end
 
 -- ================================================================
---   THEME  (pulled from config)
+--   THEME
 -- ================================================================
-local ac        = cfg.color or {88, 130, 255}
+local ac        = cfg.color
 local ACCENT    = Color3.fromRGB(ac[1], ac[2], ac[3])
-local BG_DARK   = Color3.fromRGB(13, 13, 20)
-local BG_MID    = Color3.fromRGB(22, 22, 34)
-local BG_CARD   = Color3.fromRGB(30, 30, 46)
-local BG_HOVER  = Color3.fromRGB(40, 40, 60)
-local ON_COLOR  = Color3.fromRGB(60, 200, 110)
-local OFF_COLOR = Color3.fromRGB(190, 55, 55)
+local BG_DARK   = Color3.fromRGB(13,  13,  20)
+local BG_MID    = Color3.fromRGB(22,  22,  34)
+local BG_CARD   = Color3.fromRGB(30,  30,  46)
+local BG_HOVER  = Color3.fromRGB(40,  40,  60)
+local ON_COLOR  = Color3.fromRGB(60,  200, 110)
+local OFF_COLOR = Color3.fromRGB(190, 55,  55)
 local TEXT      = Color3.fromRGB(225, 225, 238)
 local DIM       = Color3.fromRGB(120, 120, 148)
 local W, H      = 380, 500
@@ -142,7 +174,6 @@ Main.Parent = Gui
 corner(Main, 10)
 stroke(Main, Color3.fromRGB(38, 38, 62), 1.5)
 
--- Accent stripe
 local stripe = Instance.new("Frame")
 stripe.Size = UDim2.new(1, 0, 0, 3)
 stripe.BackgroundColor3 = ACCENT
@@ -161,7 +192,6 @@ TitleBar.BorderSizePixel = 0
 TitleBar.Parent = Main
 corner(TitleBar, 8)
 
--- Flatten bottom corners
 local tbBot = Instance.new("Frame")
 tbBot.Size = UDim2.new(1, 0, 0, 10)
 tbBot.Position = UDim2.new(0, 0, 1, -10)
@@ -170,14 +200,13 @@ tbBot.BorderSizePixel = 0
 tbBot.Parent = TitleBar
 
 lbl(TitleBar, {
-    Text = cfg.title or "Hub",
+    Text = cfg.title,
     Size = UDim2.new(1, -80, 1, 0),
     Position = UDim2.new(0, 14, 0, 0),
     TextSize = 15,
 })
-
 lbl(TitleBar, {
-    Text = "v" .. (cfg.version or "1.0"),
+    Text = "v" .. cfg.version,
     Size = UDim2.new(0, 50, 1, 0),
     Position = UDim2.new(0, 165, 0, 0),
     TextSize = 11,
@@ -185,8 +214,8 @@ lbl(TitleBar, {
     Font = Enum.Font.Gotham,
 })
 
-local MinBtn   = mkbtn(TitleBar, { Text = "—",  Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -62, 0.5, -14), BackgroundColor3 = BG_CARD })
-local CloseBtn = mkbtn(TitleBar, { Text = "✕",  Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -30, 0.5, -14), BackgroundColor3 = OFF_COLOR })
+local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
+local CloseBtn = mkbtn(TitleBar, { Text = "✕", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_COLOR })
 
 -- Dragging
 local dragging, dStart, dOrigin
@@ -207,7 +236,7 @@ UserInputService.InputChanged:Connect(function(i)
     end
 end)
 
--- Content area (toggled by minimize)
+-- Content area
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, 0, 1, -47)
 Content.Position = UDim2.new(0, 0, 0, 47)
@@ -243,7 +272,6 @@ tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 tabLayout.Parent = TabBar
 pad(TabBar, 3, 3, 4, 4)
 
--- Toggle list host
 local ListHost = Instance.new("Frame")
 ListHost.Size = UDim2.new(1, -12, 1, -52)
 ListHost.Position = UDim2.new(0, 6, 0, 46)
@@ -254,10 +282,10 @@ ListHost.Parent = Content
 --   TOGGLE CARD BUILDER
 -- ================================================================
 local function buildToggleCard(tcfg, order, parent)
-    local name      = tcfg.name      or "Toggle"
-    local desc      = tcfg.desc      or ""
-    local onScript  = tcfg.onScript  or ""
-    local offScript = tcfg.offScript or ""
+    local name      = tostring(tcfg.name      or "Toggle")
+    local desc      = tostring(tcfg.desc      or "")
+    local onScript  = tostring(tcfg.onScript  or "")
+    local offScript = tostring(tcfg.offScript or "")
 
     local Card = Instance.new("Frame")
     Card.Name = "Card_" .. name
@@ -332,18 +360,17 @@ local function buildToggleCard(tcfg, order, parent)
 end
 
 -- ================================================================
---   BUILD TABS FROM CONFIG
+--   BUILD TABS
 -- ================================================================
-local tabs        = cfg.tabs or {}
 local tabBtns     = {}
 local tabContents = {}
 
-for ti, tab in ipairs(tabs) do
-    local numTabs = #tabs
+for ti, tab in ipairs(cfg.tabs) do
+    local numTabs = #cfg.tabs
     local tabW = math.floor((W - 12 - (numTabs - 1) * 3 - 8) / numTabs)
 
     local tabBtn = mkbtn(TabBar, {
-        Text = tab.name or ("Tab " .. ti),
+        Text = tostring(tab.name or ("Tab " .. ti)),
         Size = UDim2.new(0, tabW, 1, 0),
         BackgroundTransparency = 1,
         TextColor3 = DIM,
@@ -352,7 +379,6 @@ for ti, tab in ipairs(tabs) do
     })
     tabBtns[ti] = tabBtn
 
-    -- Per-tab scroll container
     local tabScroll = Instance.new("ScrollingFrame")
     tabScroll.Name = "Tab_" .. ti
     tabScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -375,10 +401,9 @@ for ti, tab in ipairs(tabs) do
         tabScroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
     end)
 
-    if tab.toggles then
-        for oi, toggleCfg in ipairs(tab.toggles) do
-            buildToggleCard(toggleCfg, oi, tabScroll)
-        end
+    local toggles = tab.toggles or {}
+    for oi, toggleCfg in ipairs(toggles) do
+        buildToggleCard(toggleCfg, oi, tabScroll)
     end
 
     tabBtn.MouseButton1Click:Connect(function()
@@ -400,7 +425,9 @@ for ti, tab in ipairs(tabs) do
 end
 
 -- Activate first tab
-if tabBtns[1] then tabBtns[1].MouseButton1Click:Fire() end
+if tabBtns[1] then
+    tabBtns[1].MouseButton1Click:Fire()
+end
 
 -- ================================================================
 --   KEYBIND: RightShift = show / hide
@@ -412,4 +439,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("[Hub] Ready! Press RightShift to toggle visibility.")
+print("[Hub] Ready! Press RightShift to show/hide.")
