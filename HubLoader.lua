@@ -1,83 +1,80 @@
 -- ================================================================
---   HubLoader.lua  —  Host this on GitHub
+--   HubLoader.lua
+--   loadstring(game:HttpGet("https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubLoader.lua"))()
 --
---   One-liner for players to run in their executor:
---   loadstring(game:HttpGet("https://raw.githubusercontent.com/YOURUSER/myhub/main/HubLoader.lua"))()
+--   This file never needs to change. All content lives in:
+--     HubConfig.lua   — branding, tabs, list of game file URLs
+--     Games/*.lua     — one file per game
 -- ================================================================
 
--- !! SET THIS to your GitHub Raw URL for HubConfig.lua !!
 local CONFIG_URL = "https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubConfig.lua"
 
 -- ================================================================
---   FETCH HELPER  (broad executor compatibility)
+--   HTTP FETCH
 -- ================================================================
 local function httpGet(url)
-
-    -- Method 1: game:HttpGet  (Synapse X, Fluxus, most modern executors)
     local ok1, r1 = pcall(function() return game:HttpGet(url, true) end)
     if ok1 and type(r1) == "string" and #r1 > 0 then return r1 end
 
-    -- Method 2: HttpGet global  (some older executors)
     if typeof(HttpGet) == "function" then
         local ok2, r2 = pcall(HttpGet, url, true)
         if ok2 and type(r2) == "string" and #r2 > 0 then return r2 end
     end
-
-    -- Method 3: syn.request  (Synapse X)
     if typeof(syn) == "table" and typeof(syn.request) == "function" then
         local ok3, r3 = pcall(syn.request, { Url = url, Method = "GET" })
         if ok3 and r3 and type(r3.Body) == "string" and #r3.Body > 0 then return r3.Body end
     end
-
-    -- Method 4: http.request  (Fluxus / Celery)
     if typeof(http) == "table" and typeof(http.request) == "function" then
         local ok4, r4 = pcall(http.request, { Url = url, Method = "GET" })
         if ok4 and r4 and type(r4.Body) == "string" and #r4.Body > 0 then return r4.Body end
     end
-
-    -- Method 5: request global  (KRNL / Electron / others)
     if typeof(request) == "function" then
         local ok5, r5 = pcall(request, { Url = url, Method = "GET" })
         if ok5 and r5 and type(r5.Body) == "string" and #r5.Body > 0 then return r5.Body end
     end
-
-    -- Method 6: HttpService:GetAsync  (last resort)
-    local ok6, r6 = pcall(function()
-        return game:GetService("HttpService"):GetAsync(url, true)
-    end)
+    local ok6, r6 = pcall(function() return game:GetService("HttpService"):GetAsync(url, true) end)
     if ok6 and type(r6) == "string" and #r6 > 0 then return r6 end
 
     error("[Hub] No working HTTP method found in this executor.")
 end
 
+local function fetchLua(url)
+    local raw = httpGet(url)
+    local fn, err = loadstring(raw)
+    if not fn then error("[Hub] Parse error (" .. url .. "): " .. tostring(err)) end
+    local ok, result = pcall(fn)
+    if not ok then error("[Hub] Runtime error (" .. url .. "): " .. tostring(result)) end
+    return result
+end
+
 -- ================================================================
---   LOAD + VALIDATE CONFIG FROM GITHUB
+--   LOAD MAIN CONFIG
 -- ================================================================
-print("[Hub] Fetching config from GitHub...")
+print("[Hub] Loading config...")
+local cfg = fetchLua(CONFIG_URL)
+if type(cfg) ~= "table" then error("[Hub] HubConfig.lua must return a table.") end
 
-local rawConfig
-local fetchOk, fetchErr = pcall(function() rawConfig = httpGet(CONFIG_URL) end)
-if not fetchOk then
-    error("[Hub] HTTP fetch failed: " .. tostring(fetchErr))
+cfg.title     = cfg.title     or "Hub"
+cfg.version   = cfg.version   or "1.0"
+cfg.color     = cfg.color     or {88, 130, 255}
+cfg.tabs      = cfg.tabs      or {}
+cfg.gameFiles = cfg.gameFiles or {}
+
+-- ================================================================
+--   LOAD EACH GAME FILE
+-- ================================================================
+local games = {}
+for i, url in ipairs(cfg.gameFiles) do
+    local ok, result = pcall(fetchLua, url)
+    if ok and type(result) == "table" then
+        table.insert(games, result)
+        print("[Hub] Loaded game: " .. tostring(result.name or url))
+    else
+        warn("[Hub] Failed to load game file (" .. url .. "): " .. tostring(result))
+    end
 end
 
-local configFn, parseErr = loadstring(rawConfig)
-if not configFn then
-    error("[Hub] Config syntax error: " .. tostring(parseErr))
-end
-
-local runOk, cfg = pcall(configFn)
-if not runOk or type(cfg) ~= "table" then
-    error("[Hub] Config did not return a table: " .. tostring(cfg))
-end
-
--- Safe defaults so nothing below ever sees nil
-cfg.title   = cfg.title   or "Hub"
-cfg.version = cfg.version or "1.0"
-cfg.color   = cfg.color   or {88, 130, 255}
-cfg.tabs    = cfg.tabs    or {}
-
-print("[Hub] Loaded: " .. cfg.title .. " v" .. cfg.version .. " | " .. #cfg.tabs .. " tab(s)")
+print("[Hub] Ready — " .. #cfg.tabs .. " tabs, " .. #games .. " games")
 
 -- ================================================================
 --   SERVICES
@@ -94,17 +91,17 @@ if prev then prev:Destroy() end
 -- ================================================================
 --   THEME
 -- ================================================================
-local ac        = cfg.color
-local ACCENT    = Color3.fromRGB(ac[1], ac[2], ac[3])
-local BG_DARK   = Color3.fromRGB(13,  13,  20)
-local BG_MID    = Color3.fromRGB(22,  22,  34)
-local BG_CARD   = Color3.fromRGB(30,  30,  46)
-local BG_HOVER  = Color3.fromRGB(40,  40,  60)
-local ON_COLOR  = Color3.fromRGB(60,  200, 110)
-local OFF_COLOR = Color3.fromRGB(190, 55,  55)
-local TEXT      = Color3.fromRGB(225, 225, 238)
-local DIM       = Color3.fromRGB(120, 120, 148)
-local W, H      = 380, 500
+local ac       = cfg.color
+local ACCENT   = Color3.fromRGB(ac[1], ac[2], ac[3])
+local BG_DARK  = Color3.fromRGB(13,  13,  20)
+local BG_MID   = Color3.fromRGB(22,  22,  34)
+local BG_CARD  = Color3.fromRGB(30,  30,  46)
+local BG_HOVER = Color3.fromRGB(40,  40,  60)
+local ON_CLR   = Color3.fromRGB(60,  200, 110)
+local OFF_CLR  = Color3.fromRGB(190, 55,  55)
+local TEXT     = Color3.fromRGB(225, 225, 238)
+local DIM      = Color3.fromRGB(120, 120, 148)
+local W, H     = 390, 510
 
 -- ================================================================
 --   UI HELPERS
@@ -114,14 +111,12 @@ local function corner(p, r)
     c.CornerRadius = UDim.new(0, r or 8)
     c.Parent = p
 end
-
 local function stroke(p, col, thick)
     local s = Instance.new("UIStroke")
     s.Color = col or Color3.fromRGB(40, 40, 65)
     s.Thickness = thick or 1
     s.Parent = p
 end
-
 local function pad(p, t, b, l, r)
     local u = Instance.new("UIPadding")
     u.PaddingTop    = UDim.new(0, t or 0)
@@ -130,7 +125,6 @@ local function pad(p, t, b, l, r)
     u.PaddingRight  = UDim.new(0, r or 0)
     u.Parent = p
 end
-
 local function lbl(parent, props)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1
@@ -142,7 +136,6 @@ local function lbl(parent, props)
     l.Parent = parent
     return l
 end
-
 local function mkbtn(parent, props)
     local b = Instance.new("TextButton")
     b.BorderSizePixel = 0
@@ -154,132 +147,30 @@ local function mkbtn(parent, props)
     corner(b, 6)
     return b
 end
+local function makeScrollFrame(parent, name)
+    local sf = Instance.new("ScrollingFrame")
+    sf.Name = name or "Scroll"
+    sf.Size = UDim2.new(1, 0, 1, 0)
+    sf.BackgroundTransparency = 1
+    sf.BorderSizePixel = 0
+    sf.ScrollBarThickness = 4
+    sf.ScrollBarImageColor3 = ACCENT
+    sf.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sf.Visible = false
+    sf.Parent = parent
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 6)
+    layout.Parent = sf
+    pad(sf, 4, 8, 0, 0)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        sf.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+    end)
+    return sf
+end
 
 -- ================================================================
---   SCREEN GUI + MAIN FRAME
--- ================================================================
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "GHubGui"
-Gui.ResetOnSpawn = false
-Gui.DisplayOrder = 999
-Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-Gui.Parent = guiParent
-
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, W, 0, H)
-Main.Position = UDim2.new(0.5, -W/2, 0.5, -H/2)
-Main.BackgroundColor3 = BG_DARK
-Main.BorderSizePixel = 0
-Main.Parent = Gui
-corner(Main, 10)
-stroke(Main, Color3.fromRGB(38, 38, 62), 1.5)
-
-local stripe = Instance.new("Frame")
-stripe.Size = UDim2.new(1, 0, 0, 3)
-stripe.BackgroundColor3 = ACCENT
-stripe.BorderSizePixel = 0
-stripe.Parent = Main
-corner(stripe, 4)
-
--- ================================================================
---   TITLE BAR
--- ================================================================
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 44)
-TitleBar.Position = UDim2.new(0, 0, 0, 3)
-TitleBar.BackgroundColor3 = BG_MID
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = Main
-corner(TitleBar, 8)
-
-local tbBot = Instance.new("Frame")
-tbBot.Size = UDim2.new(1, 0, 0, 10)
-tbBot.Position = UDim2.new(0, 0, 1, -10)
-tbBot.BackgroundColor3 = BG_MID
-tbBot.BorderSizePixel = 0
-tbBot.Parent = TitleBar
-
-lbl(TitleBar, {
-    Text = cfg.title,
-    Size = UDim2.new(1, -80, 1, 0),
-    Position = UDim2.new(0, 14, 0, 0),
-    TextSize = 15,
-})
-lbl(TitleBar, {
-    Text = "v" .. cfg.version,
-    Size = UDim2.new(0, 50, 1, 0),
-    Position = UDim2.new(0, 165, 0, 0),
-    TextSize = 11,
-    TextColor3 = DIM,
-    Font = Enum.Font.Gotham,
-})
-
-local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
-local CloseBtn = mkbtn(TitleBar, { Text = "X", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_COLOR })
-
--- Dragging
-local dragging, dStart, dOrigin
-TitleBar.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        dragging, dStart, dOrigin = true, i.Position, Main.Position
-    end
-end)
-TitleBar.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-UserInputService.InputChanged:Connect(function(i)
-    if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-        local d = i.Position - dStart
-        Main.Position = UDim2.new(dOrigin.X.Scale, dOrigin.X.Offset + d.X, dOrigin.Y.Scale, dOrigin.Y.Offset + d.Y)
-    end
-end)
-
--- Content area
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 1, -47)
-Content.Position = UDim2.new(0, 0, 0, 47)
-Content.BackgroundTransparency = 1
-Content.Parent = Main
-
-local minimized = false
-MinBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    Content.Visible = not minimized
-    Main.Size = minimized and UDim2.new(0, W, 0, 47) or UDim2.new(0, W, 0, H)
-    MinBtn.Text = minimized and "▲" or "—"
-end)
-CloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
-
--- ================================================================
---   TAB BAR
--- ================================================================
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -12, 0, 34)
-TabBar.Position = UDim2.new(0, 6, 0, 6)
-TabBar.BackgroundColor3 = BG_MID
-TabBar.BorderSizePixel = 0
-TabBar.Parent = Content
-corner(TabBar, 7)
-stroke(TabBar, Color3.fromRGB(38, 38, 60))
-
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Padding = UDim.new(0, 3)
-tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-tabLayout.Parent = TabBar
-pad(TabBar, 3, 3, 4, 4)
-
-local ListHost = Instance.new("Frame")
-ListHost.Size = UDim2.new(1, -12, 1, -52)
-ListHost.Position = UDim2.new(0, 6, 0, 46)
-ListHost.BackgroundTransparency = 1
-ListHost.Parent = Content
-
--- ================================================================
---   TOGGLE CARD BUILDER
+--   TOGGLE CARD
 -- ================================================================
 local function buildToggleCard(tcfg, order, parent)
     local name      = tostring(tcfg.name      or "Toggle")
@@ -288,7 +179,6 @@ local function buildToggleCard(tcfg, order, parent)
     local offScript = tostring(tcfg.offScript or "")
 
     local Card = Instance.new("Frame")
-    Card.Name = "Card_" .. name
     Card.Size = UDim2.new(1, 0, 0, 58)
     Card.BackgroundColor3 = BG_CARD
     Card.BorderSizePixel = 0
@@ -317,19 +207,18 @@ local function buildToggleCard(tcfg, order, parent)
     })
 
     local enabled = false
-
-    local function setState(on, err)
+    local function setState(on, errored)
         enabled = on
-        if err then
+        if errored then
             togBtn.Text = "ERR"
             togBtn.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
             togBtn.TextColor3 = TEXT
             dot.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
         elseif on then
             togBtn.Text = "ON"
-            togBtn.BackgroundColor3 = ON_COLOR
+            togBtn.BackgroundColor3 = ON_CLR
             togBtn.TextColor3 = BG_DARK
-            dot.BackgroundColor3 = ON_COLOR
+            dot.BackgroundColor3 = ON_CLR
         else
             togBtn.Text = "OFF"
             togBtn.BackgroundColor3 = BG_HOVER
@@ -341,93 +230,323 @@ local function buildToggleCard(tcfg, order, parent)
     togBtn.MouseButton1Click:Connect(function()
         local turningOn = not enabled
         local code = turningOn and onScript or offScript
-        if code and code ~= "" then
-            local fn, compErr = loadstring(code)
-            if not fn then
-                warn("[Hub] Compile error '" .. name .. "': " .. tostring(compErr))
-                setState(false, true)
-                return
-            end
-            local runOk, runErr = pcall(fn)
-            if not runOk then
-                warn("[Hub] Runtime error '" .. name .. "': " .. tostring(runErr))
-                setState(false, true)
-                return
-            end
+        if code ~= "" then
+            local compiled, compErr = loadstring(code)
+            if not compiled then warn("[Hub] Compile error '" .. name .. "': " .. tostring(compErr)) setState(false, true) return end
+            local runOk, runErr = pcall(compiled)
+            if not runOk then warn("[Hub] Runtime error '" .. name .. "': " .. tostring(runErr)) setState(false, true) return end
         end
         setState(turningOn, false)
     end)
 end
 
 -- ================================================================
---   BUILD TABS
+--   GAME CARD
 -- ================================================================
-local tabBtns     = {}
-local tabContents = {}
+local function buildGameCard(gameCfg, order, parent, onOpen)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, 0, 0, 64)
+    Card.BackgroundColor3 = BG_CARD
+    Card.BorderSizePixel = 0
+    Card.LayoutOrder = order
+    Card.Parent = parent
+    corner(Card, 8)
+    stroke(Card, Color3.fromRGB(38, 38, 58))
+
+    local icon = Instance.new("Frame")
+    icon.Size = UDim2.new(0, 44, 0, 44)
+    icon.Position = UDim2.new(0, 10, 0.5, -22)
+    icon.BackgroundColor3 = BG_MID
+    icon.BorderSizePixel = 0
+    icon.Parent = Card
+    corner(icon, 8)
+    stroke(icon, ACCENT, 1.5)
+
+    local iconLbl = Instance.new("TextLabel")
+    iconLbl.Size = UDim2.new(1, 0, 1, 0)
+    iconLbl.BackgroundTransparency = 1
+    iconLbl.Text = "🎮"
+    iconLbl.TextSize = 20
+    iconLbl.Font = Enum.Font.GothamBold
+    iconLbl.TextColor3 = ACCENT
+    iconLbl.Parent = icon
+
+    lbl(Card, { Text = tostring(gameCfg.name or "Game"), Size = UDim2.new(1,-160,0,22), Position = UDim2.new(0,64,0,12), TextSize = 13 })
+    lbl(Card, { Text = tostring(gameCfg.desc or ""),     Size = UDim2.new(1,-160,0,18), Position = UDim2.new(0,64,0,33), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
+
+    local openBtn = mkbtn(Card, {
+        Text = "Open  ›",
+        Size = UDim2.new(0, 72, 0, 30),
+        Position = UDim2.new(1, -84, 0.5, -15),
+        BackgroundColor3 = ACCENT,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 12,
+    })
+    openBtn.MouseButton1Click:Connect(function() onOpen(gameCfg) end)
+end
+
+-- ================================================================
+--   SCREEN GUI
+-- ================================================================
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "GHubGui"
+Gui.ResetOnSpawn = false
+Gui.DisplayOrder = 999
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = guiParent
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, W, 0, H)
+Main.Position = UDim2.new(0.5, -W/2, 0.5, -H/2)
+Main.BackgroundColor3 = BG_DARK
+Main.BorderSizePixel = 0
+Main.Parent = Gui
+corner(Main, 10)
+stroke(Main, Color3.fromRGB(38, 38, 62), 1.5)
+
+local topStripe = Instance.new("Frame")
+topStripe.Size = UDim2.new(1, 0, 0, 3)
+topStripe.BackgroundColor3 = ACCENT
+topStripe.BorderSizePixel = 0
+topStripe.Parent = Main
+corner(topStripe, 4)
+
+-- ── Title bar ──
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 44)
+TitleBar.Position = UDim2.new(0, 0, 0, 3)
+TitleBar.BackgroundColor3 = BG_MID
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Main
+corner(TitleBar, 8)
+
+local tbPatch = Instance.new("Frame")
+tbPatch.Size = UDim2.new(1, 0, 0, 10)
+tbPatch.Position = UDim2.new(0, 0, 1, -10)
+tbPatch.BackgroundColor3 = BG_MID
+tbPatch.BorderSizePixel = 0
+tbPatch.Parent = TitleBar
+
+lbl(TitleBar, { Text = cfg.title, Size = UDim2.new(1,-80,1,0), Position = UDim2.new(0,14,0,0), TextSize = 15 })
+lbl(TitleBar, { Text = "v"..cfg.version, Size = UDim2.new(0,50,1,0), Position = UDim2.new(0,170,0,0), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
+
+local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
+local CloseBtn = mkbtn(TitleBar, { Text = "✕", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-30,0.5,-14), BackgroundColor3 = OFF_CLR })
+
+local dragging, dStart, dOrigin
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragging, dStart, dOrigin = true, i.Position, Main.Position
+    end
+end)
+TitleBar.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+        local d = i.Position - dStart
+        Main.Position = UDim2.new(dOrigin.X.Scale, dOrigin.X.Offset + d.X, dOrigin.Y.Scale, dOrigin.Y.Offset + d.Y)
+    end
+end)
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -47)
+Content.Position = UDim2.new(0, 0, 0, 47)
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    Content.Visible = not minimized
+    Main.Size = minimized and UDim2.new(0, W, 0, 47) or UDim2.new(0, W, 0, H)
+    MinBtn.Text = minimized and "▲" or "—"
+end)
+CloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
+
+-- ── Tab bar ──
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -12, 0, 34)
+TabBar.Position = UDim2.new(0, 6, 0, 6)
+TabBar.BackgroundColor3 = BG_MID
+TabBar.BorderSizePixel = 0
+TabBar.Parent = Content
+corner(TabBar, 7)
+stroke(TabBar, Color3.fromRGB(38, 38, 60))
+
+local tabRowLayout = Instance.new("UIListLayout")
+tabRowLayout.FillDirection = Enum.FillDirection.Horizontal
+tabRowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabRowLayout.Padding = UDim.new(0, 3)
+tabRowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+tabRowLayout.Parent = TabBar
+pad(TabBar, 3, 3, 4, 4)
+
+local ListHost = Instance.new("Frame")
+ListHost.Size = UDim2.new(1, -12, 1, -52)
+ListHost.Position = UDim2.new(0, 6, 0, 46)
+ListHost.BackgroundTransparency = 1
+ListHost.Parent = Content
+
+-- ================================================================
+--   BUILD REGULAR TABS
+-- ================================================================
+local allTabBtns     = {}
+local allTabContents = {}
+
+local totalTabs = #cfg.tabs + 1
+local tabW = math.floor((W - 12 - (totalTabs - 1) * 3 - 8) / totalTabs)
+
+local function deactivateAll()
+    for _, tb in ipairs(allTabBtns) do
+        tb.BackgroundTransparency = 1
+        tb.TextColor3 = DIM
+    end
+    for _, tc in ipairs(allTabContents) do tc.Visible = false end
+end
 
 for ti, tab in ipairs(cfg.tabs) do
-    local numTabs = #cfg.tabs
-    local tabW = math.floor((W - 12 - (numTabs - 1) * 3 - 8) / numTabs)
-
     local tabBtn = mkbtn(TabBar, {
-        Text = tostring(tab.name or ("Tab " .. ti)),
+        Text = tostring(tab.name or ("Tab "..ti)),
         Size = UDim2.new(0, tabW, 1, 0),
         BackgroundTransparency = 1,
         TextColor3 = DIM,
-        TextSize = 12,
+        TextSize = 11,
         LayoutOrder = ti,
     })
-    tabBtns[ti] = tabBtn
+    allTabBtns[ti] = tabBtn
 
-    local tabScroll = Instance.new("ScrollingFrame")
-    tabScroll.Name = "Tab_" .. ti
-    tabScroll.Size = UDim2.new(1, 0, 1, 0)
-    tabScroll.BackgroundTransparency = 1
-    tabScroll.BorderSizePixel = 0
-    tabScroll.ScrollBarThickness = 4
-    tabScroll.ScrollBarImageColor3 = ACCENT
-    tabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabScroll.Visible = false
-    tabScroll.Parent = ListHost
-    tabContents[ti] = tabScroll
+    local tabScroll = makeScrollFrame(ListHost, "Tab_"..ti)
+    allTabContents[ti] = tabScroll
 
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 6)
-    layout.Parent = tabScroll
-    pad(tabScroll, 4, 4, 0, 0)
-
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        tabScroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
-    end)
-
-    local toggles = tab.toggles or {}
-    for oi, toggleCfg in ipairs(toggles) do
-        buildToggleCard(toggleCfg, oi, tabScroll)
+    for oi, tcfg in ipairs(tab.toggles or {}) do
+        buildToggleCard(tcfg, oi, tabScroll)
     end
 
     tabBtn.MouseButton1Click:Connect(function()
-        for i, tb in ipairs(tabBtns) do
-            if i == ti then
-                tb.BackgroundTransparency = 0
-                tb.BackgroundColor3 = ACCENT
-                tb.TextColor3 = Color3.fromRGB(255, 255, 255)
-            else
-                tb.BackgroundTransparency = 1
-                tb.TextColor3 = DIM
-            end
-        end
-        for i, tc in ipairs(tabContents) do
-            tc.Visible = (i == ti)
-            if i == ti then tc.CanvasPosition = Vector2.zero end
-        end
+        deactivateAll()
+        GamesPanel.Visible = false
+        GameScriptsPanel.Visible = false
+        tabBtn.BackgroundTransparency = 0
+        tabBtn.BackgroundColor3 = ACCENT
+        tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tabScroll.Visible = true
+        tabScroll.CanvasPosition = Vector2.zero
     end)
 end
 
--- Activate first tab
-if tabBtns[1] then
-    tabBtns[1].MouseButton1Click:Fire()
+-- ================================================================
+--   GAMES TAB
+-- ================================================================
+local gamesIdx = #cfg.tabs + 1
+
+local GamesTabBtn = mkbtn(TabBar, {
+    Text = "🎮 Games",
+    Size = UDim2.new(0, tabW, 1, 0),
+    BackgroundTransparency = 1,
+    TextColor3 = DIM,
+    TextSize = 11,
+    LayoutOrder = gamesIdx,
+})
+allTabBtns[gamesIdx] = GamesTabBtn
+
+-- Games list panel
+local GamesPanel = makeScrollFrame(ListHost, "GamesPanel")
+
+-- Game scripts sub-panel
+local GameScriptsPanel = Instance.new("Frame")
+GameScriptsPanel.Name = "GameScriptsPanel"
+GameScriptsPanel.Size = UDim2.new(1, 0, 1, 0)
+GameScriptsPanel.BackgroundTransparency = 1
+GameScriptsPanel.Visible = false
+GameScriptsPanel.Parent = ListHost
+
+local BackBar = Instance.new("Frame")
+BackBar.Size = UDim2.new(1, 0, 0, 32)
+BackBar.BackgroundColor3 = BG_MID
+BackBar.BorderSizePixel = 0
+BackBar.Parent = GameScriptsPanel
+corner(BackBar, 7)
+stroke(BackBar, Color3.fromRGB(38, 38, 60))
+
+local BackBtn = mkbtn(BackBar, {
+    Text = "‹ Back",
+    Size = UDim2.new(0, 60, 1, 0),
+    BackgroundTransparency = 1,
+    TextColor3 = ACCENT,
+    TextSize = 12,
+})
+local GameTitleLbl = lbl(BackBar, {
+    Text = "",
+    Size = UDim2.new(1, -70, 1, 0),
+    Position = UDim2.new(0, 65, 0, 0),
+    TextSize = 13,
+})
+
+local ScriptsScroll = Instance.new("ScrollingFrame")
+ScriptsScroll.Size = UDim2.new(1, 0, 1, -38)
+ScriptsScroll.Position = UDim2.new(0, 0, 0, 38)
+ScriptsScroll.BackgroundTransparency = 1
+ScriptsScroll.BorderSizePixel = 0
+ScriptsScroll.ScrollBarThickness = 4
+ScriptsScroll.ScrollBarImageColor3 = ACCENT
+ScriptsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScriptsScroll.Parent = GameScriptsPanel
+
+local scriptsLayout = Instance.new("UIListLayout")
+scriptsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+scriptsLayout.Padding = UDim.new(0, 6)
+scriptsLayout.Parent = ScriptsScroll
+pad(ScriptsScroll, 4, 8, 0, 0)
+scriptsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScriptsScroll.CanvasSize = UDim2.new(0, 0, 0, scriptsLayout.AbsoluteContentSize.Y + 12)
+end)
+
+local function openGameScripts(gameCfg)
+    GamesPanel.Visible = false
+    GameScriptsPanel.Visible = true
+    GameTitleLbl.Text = tostring(gameCfg.name or "Game")
+    ScriptsScroll.CanvasPosition = Vector2.zero
+
+    for _, child in ipairs(ScriptsScroll:GetChildren()) do
+        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then child:Destroy() end
+    end
+
+    local scripts = gameCfg.scripts or {}
+    if #scripts == 0 then
+        lbl(ScriptsScroll, { Text = "No scripts yet.", Size = UDim2.new(1,0,0,30), TextColor3 = DIM, TextXAlignment = Enum.TextXAlignment.Center, Font = Enum.Font.Gotham, TextSize = 12, LayoutOrder = 1 })
+    else
+        for si, scfg in ipairs(scripts) do
+            buildToggleCard(scfg, si, ScriptsScroll)
+        end
+    end
 end
+
+BackBtn.MouseButton1Click:Connect(function()
+    GameScriptsPanel.Visible = false
+    GamesPanel.Visible = true
+end)
+
+for gi, gameCfg in ipairs(games) do
+    buildGameCard(gameCfg, gi, GamesPanel, openGameScripts)
+end
+
+if #games == 0 then
+    lbl(GamesPanel, { Text = "No game files loaded.", Size = UDim2.new(1,0,0,30), TextColor3 = DIM, TextXAlignment = Enum.TextXAlignment.Center, Font = Enum.Font.Gotham, TextSize = 12, LayoutOrder = 1 })
+end
+
+GamesTabBtn.MouseButton1Click:Connect(function()
+    deactivateAll()
+    GamesTabBtn.BackgroundTransparency = 0
+    GamesTabBtn.BackgroundColor3 = ACCENT
+    GamesTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    if not GameScriptsPanel.Visible then
+        GamesPanel.Visible = true
+    end
+end)
+
+-- Activate first tab
+if allTabBtns[1] then allTabBtns[1].MouseButton1Click:Fire() end
 
 -- ================================================================
 --   KEYBIND: RightShift = show / hide
@@ -439,4 +558,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("[Hub] Ready! Press RightShift to show/hide.")
+print("[Hub] Ready! RightShift to show/hide.")
