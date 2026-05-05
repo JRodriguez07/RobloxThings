@@ -1,134 +1,103 @@
 -- ================================================================
 --   HubLoader.lua
---   loadstring(game:HttpGet("https://raw.githubusercontent.com/JRodriguez07/RobloxThings/refs/heads/main/HubLoader.lua"))()
+--   loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/HubLoader.lua?nc=" .. math.random(1, 2147483647)))()
 -- ================================================================
 
 local CONFIG_URL = "https://cdn.jsdelivr.net/gh/JRodriguez07/RobloxThings@main/HubConfig.lua"
 
 -- ================================================================
 --   HTTP FETCH
---   Uses type() not typeof() — works in all Lua environments.
---   Every attempt is individually pcall'd.
---   Prints which method worked so you can see it in the console.
 -- ================================================================
 local function httpGet(url)
-
-    -- Method 1: game:HttpGet (most executors)
     local s1, r1 = pcall(game.HttpGet, game, url, true)
-    if s1 and type(r1) == "string" and #r1 > 10 then
-        print("[Hub] HTTP via game:HttpGet")
-        return r1
-    end
+    if s1 and type(r1) == "string" and #r1 > 10 then return r1 end
 
-    -- Method 2: request() global (KRNL, Electron, etc.)
-    local s2, r2 = pcall(function()
-        return request({ Url = url, Method = "GET" })
-    end)
-    if s2 and type(r2) == "table" and type(r2.Body) == "string" and #r2.Body > 10 then
-        print("[Hub] HTTP via request()")
-        return r2.Body
-    end
+    local s2, r2 = pcall(function() return request({ Url = url, Method = "GET" }) end)
+    if s2 and type(r2) == "table" and type(r2.Body) == "string" and #r2.Body > 10 then return r2.Body end
 
-    -- Method 3: syn.request (Synapse X)
-    local s3, r3 = pcall(function()
-        return syn.request({ Url = url, Method = "GET" })
-    end)
-    if s3 and type(r3) == "table" and type(r3.Body) == "string" and #r3.Body > 10 then
-        print("[Hub] HTTP via syn.request")
-        return r3.Body
-    end
+    local s3, r3 = pcall(function() return syn.request({ Url = url, Method = "GET" }) end)
+    if s3 and type(r3) == "table" and type(r3.Body) == "string" and #r3.Body > 10 then return r3.Body end
 
-    -- Method 4: http.request (Fluxus / Celery)
-    local s4, r4 = pcall(function()
-        return http.request({ Url = url, Method = "GET" })
-    end)
-    if s4 and type(r4) == "table" and type(r4.Body) == "string" and #r4.Body > 10 then
-        print("[Hub] HTTP via http.request")
-        return r4.Body
-    end
+    local s4, r4 = pcall(function() return http.request({ Url = url, Method = "GET" }) end)
+    if s4 and type(r4) == "table" and type(r4.Body) == "string" and #r4.Body > 10 then return r4.Body end
 
-    -- Method 5: HttpGet global (some older executors)
-    local s5, r5 = pcall(function()
-        return HttpGet(url, true)
-    end)
-    if s5 and type(r5) == "string" and #r5 > 10 then
-        print("[Hub] HTTP via HttpGet()")
-        return r5
-    end
+    local s5, r5 = pcall(function() return HttpGet(url, true) end)
+    if s5 and type(r5) == "string" and #r5 > 10 then return r5 end
 
-    -- Method 6: game.HttpGetAsync (Wave / newer executors)
-    local s6, r6 = pcall(function()
-        return game:HttpGetAsync(url)
-    end)
-    if s6 and type(r6) == "string" and #r6 > 10 then
-        print("[Hub] HTTP via game:HttpGetAsync")
-        return r6
-    end
+    local s6, r6 = pcall(function() return game:HttpGetAsync(url) end)
+    if s6 and type(r6) == "string" and #r6 > 10 then return r6 end
 
-    -- Nothing worked — print exactly what each method returned
-    warn("[Hub] ALL HTTP methods failed for: " .. url)
-    warn("[Hub] Method results: "
-        .. tostring(s1) .. "/" .. tostring(r1) .. " | "
-        .. tostring(s2) .. "/" .. tostring(r2) .. " | "
-        .. tostring(s3) .. "/" .. tostring(r3)
-    )
-    error("[Hub] Could not fetch config. Check executor HTTP permissions.")
+    error("[Hub] No working HTTP method found.")
 end
 
 -- ================================================================
---   SAFE LOADSTRING WRAPPER
---   Handles executors that name it differently
+--   PURGE JSDELIVR CACHE
+--   Fires a purge request so the CDN always serves fresh content.
+--   Safe to call — failures are silently ignored.
 -- ================================================================
-local function safeLoadstring(code, chunkName)
-    -- Standard loadstring
-    local fn, err = loadstring(code, chunkName or "hub_chunk")
+local function purge(url)
+    local purgeUrl = url
+        :gsub("cdn.jsdelivr.net/gh", "purge.jsdelivr.net/gh")
+        :gsub("%?.*", "")  -- strip any query params from purge URL
+    pcall(httpGet, purgeUrl)
+    print("[Hub] Purged: " .. purgeUrl)
+end
+
+-- ================================================================
+--   SAFE LOADSTRING
+-- ================================================================
+local function safeLoadstring(code, name)
+    local fn, err = loadstring(code, name or "hub")
     if fn then return fn end
-
-    -- Some executors use load() instead
-    local fn2, err2 = load(code, chunkName or "hub_chunk")
+    local fn2, err2 = load(code, name or "hub")
     if fn2 then return fn2 end
-
     return nil, err or err2
 end
 
 -- ================================================================
---   FETCH + EXECUTE A LUA FILE FROM URL
+--   FETCH + EXECUTE A LUA FILE
+--   Purges CDN cache first, then fetches with a random cache buster
 -- ================================================================
 local function fetchLua(url)
+    -- Strip existing query params for clean purge/fetch
+    local cleanUrl = url:gsub("%?.*", "")
+
+    -- Purge CDN cache
+    purge(cleanUrl)
+
+    -- Fetch fresh with random cache buster
     local raw
     local fetchOk, fetchErr = pcall(function()
-        raw = httpGet(url .. "?nc=" .. tostring(math.random(1, 2147483647)))
+        raw = httpGet(cleanUrl .. "?nc=" .. tostring(math.random(1, 2147483647)))
     end)
-    if not fetchOk then
-        error("[Hub] Fetch failed for " .. url .. "\n" .. tostring(fetchErr))
+    if not fetchOk or not raw then
+        error("[Hub] Fetch failed for " .. cleanUrl .. "\n" .. tostring(fetchErr))
     end
 
-    local fn, parseErr = safeLoadstring(raw, url)
+    local fn, parseErr = safeLoadstring(raw, cleanUrl)
     if not fn then
-        error("[Hub] Parse error in " .. url .. "\n" .. tostring(parseErr))
+        error("[Hub] Parse error in " .. cleanUrl .. "\n" .. tostring(parseErr))
     end
 
     local runOk, result = pcall(fn)
     if not runOk then
-        error("[Hub] Runtime error in " .. url .. "\n" .. tostring(result))
+        error("[Hub] Runtime error in " .. cleanUrl .. "\n" .. tostring(result))
     end
 
     return result
 end
 
 -- ================================================================
---   LOAD CONFIG — wrapped so errors print clearly
+--   LOAD CONFIG
 -- ================================================================
-print("[Hub] Loading config from GitHub...")
+print("[Hub] Loading config...")
 local cfg
-local cfgOk, cfgErr = pcall(function()
-    cfg = fetchLua(CONFIG_URL)
-end)
+local cfgOk, cfgErr = pcall(function() cfg = fetchLua(CONFIG_URL) end)
 if not cfgOk then
     error("[Hub] Failed to load HubConfig.lua:\n" .. tostring(cfgErr))
 end
 if type(cfg) ~= "table" then
-    error("[Hub] HubConfig.lua must return a table, got: " .. type(cfg))
+    error("[Hub] HubConfig.lua must return a table.")
 end
 
 cfg.title     = cfg.title     or "Hub"
@@ -138,7 +107,7 @@ cfg.tabs      = cfg.tabs      or {}
 cfg.gameFiles = cfg.gameFiles or {}
 
 -- ================================================================
---   LOAD EACH GAME FILE
+--   LOAD GAME FILES
 -- ================================================================
 local games = {}
 for _, url in ipairs(cfg.gameFiles) do
@@ -147,7 +116,7 @@ for _, url in ipairs(cfg.gameFiles) do
         table.insert(games, result)
         print("[Hub] Game loaded: " .. tostring(result.name or url))
     else
-        warn("[Hub] Skipped game file: " .. url .. "\nReason: " .. tostring(result))
+        warn("[Hub] Failed to load game: " .. url .. "\n" .. tostring(result))
     end
 end
 
@@ -160,8 +129,9 @@ print("[Hub] " .. cfg.title .. " v" .. cfg.version
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer      = Players.LocalPlayer
-local guiParent        = pcall(function() return gethui() end) and gethui()
-                      or LocalPlayer:WaitForChild("PlayerGui")
+local guiParent
+local ghOk, ghResult = pcall(function() return gethui() end)
+guiParent = (ghOk and ghResult) or LocalPlayer:WaitForChild("PlayerGui")
 
 local prev = guiParent:FindFirstChild("GHubGui")
 if prev then prev:Destroy() end
@@ -396,7 +366,6 @@ topStripe.BorderSizePixel = 0
 topStripe.Parent = Main
 corner(topStripe, 4)
 
--- Title bar
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 44)
 TitleBar.Position = UDim2.new(0, 0, 0, 3)
@@ -412,7 +381,7 @@ tbPatch.BackgroundColor3 = BG_MID
 tbPatch.BorderSizePixel = 0
 tbPatch.Parent = TitleBar
 
-lbl(TitleBar, { Text = cfg.title,       Size = UDim2.new(1,-80,1,0),  Position = UDim2.new(0,14,0,0),  TextSize = 15 })
+lbl(TitleBar, { Text = cfg.title,        Size = UDim2.new(1,-80,1,0),  Position = UDim2.new(0,14,0,0),  TextSize = 15 })
 lbl(TitleBar, { Text = "v"..cfg.version, Size = UDim2.new(0,50,1,0),   Position = UDim2.new(0,170,0,0), TextSize = 11, TextColor3 = DIM, Font = Enum.Font.Gotham })
 
 local MinBtn   = mkbtn(TitleBar, { Text = "—", Size = UDim2.new(0,28,0,28), Position = UDim2.new(1,-62,0.5,-14), BackgroundColor3 = BG_CARD })
@@ -449,7 +418,6 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 CloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
 
--- Tab bar
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -12, 0, 34)
 TabBar.Position = UDim2.new(0, 6, 0, 6)
@@ -474,11 +442,11 @@ ListHost.BackgroundTransparency = 1
 ListHost.Parent = Content
 
 -- ================================================================
---   REGULAR TABS
+--   BUILD TABS
 -- ================================================================
 local allTabBtns     = {}
 local allTabContents = {}
-local GamesPanel, GameScriptsPanel  -- forward declare for deactivateAll
+local GamesPanel, GameScriptsPanel
 
 local totalTabs = #cfg.tabs + 1
 local tabW = math.floor((W - 12 - (totalTabs - 1) * 3 - 8) / totalTabs)
@@ -649,9 +617,7 @@ GamesTabBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ================================================================
---   ACTIVATE FIRST TAB ON LOAD (no :Fire() needed)
--- ================================================================
+-- Activate first tab
 activateTab(1, allTabContents[1])
 
 -- ================================================================
